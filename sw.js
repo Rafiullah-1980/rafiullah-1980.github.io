@@ -1,4 +1,4 @@
-const CACHE = 'sawari-v11';
+const CACHE = 'sawari-v12';
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -21,4 +21,29 @@ self.addEventListener('fetch', e => {
       return r;
     }).catch(() => caches.match(e.request).then(m => m || caches.match('./index.html')))
   );
+});
+
+// نئی بکنگ کا پش الرٹ (لاک اسکرین پر بھی)
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) {}
+  const title = d.title || 'نئی سواری کی بکنگ';
+  e.waitUntil(self.registration.showNotification(title, {
+    body: d.body || '',
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
+    tag: 'booking-' + (d.id || 'new'),
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [300, 120, 300, 120, 300],
+    data: { url: './index.html' }
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const target = (e.notification.data && e.notification.data.url) || './index.html';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) { if ('focus' in c) return c.focus(); }
+    return self.clients.openWindow(target);
+  }));
 });
