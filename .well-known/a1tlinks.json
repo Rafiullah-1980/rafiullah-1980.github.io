@@ -1,8 +1,0 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "com.sawari.app",
-        "sha256_cert_fingerprints": ["21:AD:8A:6C:21:F4:20:F1:B6:44:59:DF:ED:09:BC:6F:21:D4:2A:40:A1:C5:80:DE:EF:94:31:D2:86:54:18:96"]
-      }
-    }]
