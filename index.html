@@ -325,7 +325,7 @@ const T = {
     driverHome:'ڈرائیور', goOnline:'آن لائن ہوں', goOffline:'آف لائن ہوں',
     youOnline:'آپ آن لائن ہیں، بکنگ آ سکتی ہے', youOffline:'آپ آف لائن ہیں',
     myVehicle:'میری گاڑی', todayEarn:'آج کی کمائی', requests:'نئی بکنگز', myTrips:'میرے سفر',
-    accept:'قبول کریں', noRequests:'ابھی کوئی بکنگ نہیں', goOnlineFirst:'بکنگ دیکھنے کے لیے آن لائن ہوں',
+    accept:'قبول کریں', noRequests:'ابھی کوئی بکنگ نہیں', goOnlineFirst:'بکنگ دیکھنے کے لیے آن لائن ہوں', pushOn:'الرٹ آن ہو گئے، لاک اسکرین پر بھی بکنگ کی اطلاع آئے گی', pushDenied:'نوٹیفکیشن کی اجازت نہیں ملی، فون سیٹنگ میں اجازت دیں', pushNo:'اس فون پر نوٹیفکیشن سپورٹ نہیں', pushFail:'الرٹ آن نہیں ہو سکے، نیٹ چیک کریں',
     taken:'یہ بکنگ کوئی اور لے چکا', driverFound:'ڈرائیور مل گیا', driverGuest:'ڈرائیور', finish:'سفر مکمل',
     faster:'تیز پک اپ', longer:'زیادہ انتظار', finding:'قریبی ڈرائیور تلاش ہو رہا ہے', raiseHint:'جلدی ڈرائیور ملنے کے لیے کرایہ بڑھائیں', raise:'کرایہ +20 بڑھائیں',
     offerSent:'آپ کی آفر بھیج دی گئی', sendOffer:'آفر بھیجیں', min:'منٹ', trips:'سفر', newDriver:'نیا ڈرائیور', yourName:'آپ کا نام',
@@ -349,7 +349,7 @@ const T = {
     driverHome:'Driver', goOnline:'Go online', goOffline:'Go offline',
     youOnline:'You are online, bookings can arrive', youOffline:'You are offline',
     myVehicle:'My vehicle', todayEarn:"Today's earnings", requests:'New bookings', myTrips:'My trips',
-    accept:'Accept', noRequests:'No bookings yet', goOnlineFirst:'Go online to see bookings',
+    accept:'Accept', noRequests:'No bookings yet', goOnlineFirst:'Go online to see bookings', pushOn:'Alerts on. You will be notified of new bookings even on a locked screen', pushDenied:'Notification permission denied. Allow it in phone settings', pushNo:'Notifications are not supported on this phone', pushFail:'Could not turn alerts on. Check your internet',
     taken:'This booking was taken', driverFound:'Driver found', driverGuest:'Driver', finish:'Finish trip',
     faster:'faster pickup', longer:'longer wait', finding:'Finding the nearest driver', raiseHint:'Raise your fare to find a driver quicker', raise:'Raise fare +20',
     offerSent:'Your offer was sent', sendOffer:'Send offer', min:'min', trips:'trips', newDriver:'New driver', yourName:'Your name',
@@ -485,8 +485,8 @@ function contactBtns(phone){
 function okPhone(){ if(dPhone.replace(/\D/g,'').length<10){ toast(t('needPhone')); return false; } return true; }
 
 /* ============ Supabase ============ */
-const SB = 'https://tqmmtavqrdzucjgxdpyh.supabase.co/rest/v1';
-const KEY = 'sb_publishable_0xMgiCrud66T7lGSQsZGJg_98Ii0wUZ';
+const SB = 'https://tavqywlzxkkzazxjtofq.supabase.co/rest/v1';
+const KEY = 'sb_publishable_WmWHOS56xb4DGWPx1Pr52w_6EVIwm7f';
 async function api(path, method='GET', body){
   const r = await fetch(SB+path, { method, headers:{ apikey:KEY, 'Content-Type':'application/json', ...(method==='GET'||path.startsWith('/rpc')?{}:{Prefer:'return=minimal'}) }, body: body?JSON.stringify(body):undefined });
   if(!r.ok) throw new Error(await r.text());
@@ -581,7 +581,7 @@ $$('[data-role]').forEach(b=> b.onclick = ()=> setRole(b.dataset.role));
 function showRole(){ closeMenu(); $$('.screen').forEach(s=>s.classList.toggle('on', s.id==='role')); }
 $('#switchRole').onclick = showRole;
 $('#openMenu2').onclick = openMenu;
-$('#onlineBtn').onclick = ()=>{ online=!online; localStorage.setItem('online', online?'1':'0'); renderDriver(); };
+$('#onlineBtn').onclick = ()=>{ online=!online; localStorage.setItem('online', online?'1':'0'); renderDriver(); if(online){ unlockBeep(); pushRegister(true); } else pushUnregister(); };
 
 function tripCard(b, kind){
   const base = `<div class="bk"><div class="head"><span>${t(b.vehicle)}</span><span>Rs. ${b.fare}</span></div><p>${esc(b.from)} → ${esc(b.to)}</p><p>${b.km.toFixed(1)} ${t('km')}</p>`;
@@ -605,7 +605,7 @@ function renderDriver(){
   $('#whoAmI').textContent = role==='driver' ? t('driverGuest') : t('guest');
   $('#dVehicles').innerHTML = Object.keys(VEHICLES).map(k=>
     `<button class="veh" data-dv="${k}" aria-pressed="${k===dVeh}">${ICONS[VEHICLES[k].icon]}<b>${t(k)}</b></button>`).join('');
-  $$('[data-dv]').forEach(b=> b.onclick=()=>{ dVeh=b.dataset.dv; localStorage.setItem('dVeh',dVeh); renderDriver(); });
+  $$('[data-dv]').forEach(b=> b.onclick=()=>{ dVeh=b.dataset.dv; localStorage.setItem('dVeh',dVeh); renderDriver(); if(online) pushRegister(false); });
 
   const today = new Date().toDateString();
   const earn = bookings.filter(b=>b.driverDone && b.driverId===did && new Date(b.doneAt).toDateString()===today).reduce((s,b)=>s+b.fare,0);
@@ -793,12 +793,57 @@ function renderTrack(){
 }
 $('#trackBack').onclick = ()=>{ if(role==='driver') go('driver'); else { tab='progress'; go('bookings'); } };
 
+/* ============ ڈرائیور الرٹ (لاک اسکرین پش + آواز) ============ */
+const VAPID_PUBLIC = 'BIM_MZKdIPHiYCUkxzcz60Cmj3d57yr44CEGRBeHFzRxYqIa1DvP5JZgUYw0D0ZSgtKT8jQl6BqOU2GfH93di5g';
+function b64ToU8(b){ const p='='.repeat((4-b.length%4)%4); const r=atob((b+p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from([...r].map(c=>c.charCodeAt(0))); }
+async function rpc(fn, body){
+  const r = await fetch(SB+'/rpc/'+fn, { method:'POST', headers:{ apikey:KEY, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+  if(!r.ok) throw new Error(await r.text());
+}
+function pushToast(msg){ try{ const d=document.createElement('div'); d.textContent=msg; d.style.cssText='position:fixed;left:12px;right:12px;bottom:84px;z-index:99;background:#12352B;color:#fff;padding:12px 14px;border-radius:12px;text-align:center;font-size:.95rem'; document.body.appendChild(d); setTimeout(()=>d.remove(),5000); }catch(e){} }
+/* ask=true: آن لائن بٹن دبانے پر اجازت مانگیں؛ false: صرف پہلے سے ملی اجازت پر چپکے سے تازہ کریں */
+async function pushRegister(ask){
+  try{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){ if(ask) pushToast(t('pushNo')); return; }
+    let perm = Notification.permission;
+    if(perm==='default' && ask) perm = await Notification.requestPermission();
+    if(perm!=='granted'){ if(ask) pushToast(t('pushDenied')); return; }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:b64ToU8(VAPID_PUBLIC) });
+    const j = sub.toJSON();
+    await rpc('push_register', { p_did:did, p_vehicle:dVeh, p_endpoint:j.endpoint, p_p256dh:j.keys.p256dh, p_auth:j.keys.auth });
+    if(ask) pushToast(t('pushOn'));
+  }catch(e){ console.warn('push', e); if(ask) pushToast(t('pushFail')); }
+}
+async function pushUnregister(){
+  try{
+    await rpc('push_unregister', { p_did:did });
+    if('serviceWorker' in navigator){ const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); }
+  }catch(e){ console.warn('push off', e); }
+}
+/* ایپ کھلی ہو تو نئی بکنگ پر آواز اور وائبریشن */
+let actx = null, seenB = null;
+function unlockBeep(){ try{ actx = actx || new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); }catch(e){} }
+function beep(){
+  try{ navigator.vibrate && navigator.vibrate([250,100,250,100,250]); }catch(e){}
+  try{ unlockBeep(); if(!actx) return; [0,0.35,0.7].forEach(d=>{ const o=actx.createOscillator(), g=actx.createGain(); o.frequency.value=880; g.gain.value=0.25; o.connect(g); g.connect(actx.destination); o.start(actx.currentTime+d); o.stop(actx.currentTime+d+0.2); }); }catch(e){}
+}
+function checkNewForDriver(){
+  if(role!=='driver' || !online){ seenB=null; return; }
+  const open = bookings.filter(b=>!b.accepted && b.status!=='done' && b.vehicle===dVeh && (b.status==='scheduled' || b.id>Date.now()-600000));
+  const ids = new Set(open.map(b=>b.id));
+  if(seenB && open.some(b=>!seenB.has(b.id))) beep();
+  seenB = ids;
+}
+if(online) pushRegister(false);
+
 /* ہر چند سیکنڈ میں سرور سے تازہ ڈیٹا */
 let lastSig = '';
 async function tick(){
   if(document.hidden) return;
   if(!await pull()) return;
-  const sig = JSON.stringify(bookings); if(sig===lastSig) return; lastSig = sig; showAd();
+  const sig = JSON.stringify(bookings); if(sig===lastSig) return; lastSig = sig; showAd(); checkNewForDriver();
   if($('#driver').classList.contains('on')) renderDriver();
   if($('#bookings').classList.contains('on')) renderBookings();
   if($('#search').classList.contains('on')) renderSearch();
