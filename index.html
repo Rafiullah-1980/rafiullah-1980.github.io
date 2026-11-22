@@ -269,6 +269,7 @@ body[data-role=driver] .rider-only{display:none}
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
           <button class="cta off" id="pushTestLocal" style="height:44px;font-size:1rem">1) فون پر مقامی ٹیسٹ نوٹیفکیشن</button>
           <button class="cta off" id="pushTestServer" style="height:44px;font-size:1rem">2) سرور سے ٹیسٹ پش (پھر ایپ پس منظر میں بھیجیں)</button>
+          <button class="cta off" id="guideOpen" style="height:44px;font-size:1rem">3) الرٹ سیٹنگ گائیڈ</button>
         </div>
       </details>
     </div>
@@ -300,6 +301,14 @@ body[data-role=driver] .rider-only{display:none}
 <div class="toast" id="toast" role="status"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<div id="alertGuide" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;color:#1b2a20;max-height:88vh;overflow:auto;border-radius:16px;padding:18px;max-width:440px;width:100%;line-height:1.8">
+    <h2 style="margin:0 0 6px;font-size:1.15rem">الرٹ ٹھیک چلانے کے لیے ایک بار یہ سیٹنگ کریں</h2>
+    <ul id="guideBody" style="margin:0;padding:0"></ul>
+    <p style="font-size:.85rem;color:#667a6c;margin:8px 0 0">یہ سیٹنگز فون کی ہیں، ایپ انہیں خود نہیں بدل سکتی۔</p>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="cta" id="guideTest" style="height:44px;font-size:1rem">ٹیسٹ نوٹیفکیشن</button><button class="cta off" id="guideClose" style="height:44px;font-size:1rem">سمجھ گیا</button></div>
+  </div>
+</div>
 <script>
 /* ============ ترتیبات (یہاں سے کرایہ بدلیں) ============ */
 const VEHICLES = {
@@ -587,7 +596,7 @@ $$('[data-role]').forEach(b=> b.onclick = ()=> setRole(b.dataset.role));
 function showRole(){ closeMenu(); $$('.screen').forEach(s=>s.classList.toggle('on', s.id==='role')); }
 $('#switchRole').onclick = showRole;
 $('#openMenu2').onclick = openMenu;
-$('#onlineBtn').onclick = ()=>{ online=!online; localStorage.setItem('online', online?'1':'0'); renderDriver(); if(online){ unlockBeep(); pushRegister(true); } else pushUnregister(); };
+$('#onlineBtn').onclick = ()=>{ online=!online; localStorage.setItem('online', online?'1':'0'); renderDriver(); if(online){ unlockBeep(); pushRegister(true).then(async()=>{ const ok=await sendLoc(); if(!ok) pushToast('لوکیشن کی اجازت دیں، ورنہ قریبی بکنگ کے الرٹ نہیں ملیں گے'); maybeGuide(); }); startLocLoop(); } else pushUnregister(); };
 
 function tripCard(b, kind){
   const base = `<div class="bk"><div class="head"><span>${t(b.vehicle)}</span><span>Rs. ${b.fare}</span></div><p>${esc(b.from)} → ${esc(b.to)}</p><p>${b.km.toFixed(1)} ${t('km')}</p>`;
@@ -842,7 +851,45 @@ function checkNewForDriver(){
   if(seenB && open.some(b=>!seenB.has(b.id))) beep();
   seenB = ids;
 }
-if(online) pushRegister(false);
+if(online){ pushRegister(false).then(()=>sendLoc()); startLocLoop(); }
+
+/* ڈرائیور کی لوکیشن (10 کلومیٹر کے فلٹر کے لیے): ایپ کھلی ہو تو ہر منٹ تازہ ہوتی ہے */
+let lastLoc = null, locTimer = null;
+function getLoc(){
+  return new Promise(res=>{
+    if(!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lng:p.coords.longitude}), ()=>res(null), {enableHighAccuracy:false, timeout:10000, maximumAge:60000});
+  });
+}
+async function sendLoc(){
+  if(!online) return false;
+  const l = await getLoc(); if(!l) return false;
+  lastLoc = l;
+  try{ await rpc('push_location', { p_did:did, p_lat:l.lat, p_lng:l.lng }); }catch(e){ console.warn('loc', e); }
+  return true;
+}
+function startLocLoop(){ if(locTimer) return; locTimer = setInterval(()=>{ if(online && !document.hidden) sendLoc(); }, 60000); }
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && online) sendLoc(); });
+
+/* الرٹ سیٹنگ گائیڈ (فون کی سیٹنگ ویب ایپ خود نہیں بدل سکتی، اس لیے مرحلہ وار رہنمائی) */
+function guideRow(ok, text){ return `<li style="margin:8px 0;list-style:none">${ok===true?'✅':ok===false?'❌':'🔹'} ${text}</li>`; }
+function showAlertGuide(){
+  const box = $('#alertGuide'); if(!box) return;
+  const nOk = ('Notification' in window) && Notification.permission==='granted';
+  $('#guideBody').innerHTML =
+    guideRow(nOk, 'نوٹیفکیشن کی اجازت') +
+    guideRow(!!lastLoc, 'لوکیشن کی اجازت (صرف 10 کلومیٹر کے اندر کی بکنگ کے الرٹ ملیں گے)') +
+    guideRow(null, '<b>آواز اور اسکرین پر الرٹ:</b> فون Settings › Apps › <b>Chrome</b> › Notifications › <b>rafiullah-1980.github.io</b> (یا Sites) › Importance = <b>Urgent / Make sound and pop on screen</b>، آواز آن') +
+    guideRow(null, '<b>بیٹری:</b> Settings › Battery › <b>Chrome</b> (اور اگر موجود ہو تو <b>سواری</b>) › <b>Allow background activity / No restrictions (Don\'t optimize)</b>') +
+    guideRow(null, '<b>آٹو لانچ:</b> Settings › Apps › Auto launch (یا Startup manager) › Chrome آن') +
+    guideRow(null, '<b>Do Not Disturb</b> بند ہو اور فون سائلنٹ نہ ہو، نوٹیفکیشن والیوم بڑھا ہو') +
+    guideRow(null, 'لاک اسکرین: Settings › Notifications › Lock screen › Show all notification content');
+  box.style.display = 'flex';
+}
+function maybeGuide(){ try{ if(!localStorage.getItem('guideDone')) showAlertGuide(); }catch(e){ showAlertGuide(); } }
+$('#guideTest').onclick = ()=> $('#pushTestLocal').click();
+$('#guideClose').onclick = ()=>{ try{ localStorage.setItem('guideDone','1'); }catch(e){} $('#alertGuide').style.display='none'; };
+$('#guideOpen').onclick = showAlertGuide;
 
 /* الرٹ ٹیسٹ بٹن */
 $('#pushTestLocal').onclick = async ()=>{
@@ -859,7 +906,7 @@ $('#pushTestLocal').onclick = async ()=>{
 $('#pushTestServer').onclick = async ()=>{
   const id = Date.now();
   try{
-    await api('/bookings','POST',{ id, vehicle:dVeh, from_name:'ٹیسٹ الرٹ', to_name:'ٹیسٹ', fare:1, km:0, status:'searching', when_at:new Date().toISOString() });
+    await api('/bookings','POST',{ id, vehicle:dVeh, from_name:'ٹیسٹ الرٹ', to_name:'ٹیسٹ', fare:1, km:0, status:'searching', when_at:new Date().toISOString(), from_lat:lastLoc?lastLoc.lat:null, from_lng:lastLoc?lastLoc.lng:null });
     pushToast('ٹیسٹ پش بھیج دی۔ اب ایپ کو پس منظر میں بھیجیں اور 10 سیکنڈ انتظار کریں');
     setTimeout(()=>{ api('/bookings?id=eq.'+id,'DELETE').catch(()=>{}); }, 90000);
   }catch(e){ pushToast('ایرر: '+(e.message||e)); }
