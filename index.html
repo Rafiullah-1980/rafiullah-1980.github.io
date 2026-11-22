@@ -265,6 +265,12 @@ body[data-role=driver] .rider-only{display:none}
     <div class="dcard">
       <button class="cta off" id="onlineBtn"></button>
       <p class="state" id="onlineState"></p>
+      <details style="margin-top:12px"><summary style="cursor:pointer;color:var(--muted)">الرٹ ٹیسٹ</summary>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+          <button class="cta off" id="pushTestLocal" style="height:44px;font-size:1rem">1) فون پر مقامی ٹیسٹ نوٹیفکیشن</button>
+          <button class="cta off" id="pushTestServer" style="height:44px;font-size:1rem">2) سرور سے ٹیسٹ پش (پھر ایپ پس منظر میں بھیجیں)</button>
+        </div>
+      </details>
     </div>
     <div class="dcard"><h2 data-t="myVehicle"></h2><input id="dNameIn" class="txtin" data-tp="yourName"><input id="dPhoneIn" class="txtin" type="tel" inputmode="tel" data-tp="yourPhone"><div class="vehicles" id="dVehicles" style="margin:0"></div></div>
     <div class="dcard"><h2 data-t="todayEarn"></h2><div class="earn" id="earnVal">Rs. 0</div></div>
@@ -837,6 +843,27 @@ function checkNewForDriver(){
   seenB = ids;
 }
 if(online) pushRegister(false);
+
+/* الرٹ ٹیسٹ بٹن */
+$('#pushTestLocal').onclick = async ()=>{
+  try{
+    if(!('Notification' in window)) { pushToast('اس فون میں نوٹیفکیشن سپورٹ نہیں'); return; }
+    let perm = Notification.permission;
+    if(perm==='default') perm = await Notification.requestPermission();
+    if(perm!=='granted'){ pushToast('اجازت: '+perm+' — کروم سیٹنگ میں Allow کریں'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification('سواری ٹیسٹ', { body:'یہ مقامی ٹیسٹ ہے — اگر یہ نظر آئے تو نوٹیفکیشن دکھانا ٹھیک ہے', icon:'icon-192.png', vibrate:[300,120,300], requireInteraction:true, tag:'local-test' });
+    pushToast('مقامی نوٹیفکیشن بھیج دیا — پٹی کھینچ کر دیکھیں');
+  }catch(e){ pushToast('ایرر: '+(e.message||e)); }
+};
+$('#pushTestServer').onclick = async ()=>{
+  const id = Date.now();
+  try{
+    await api('/bookings','POST',{ id, vehicle:dVeh, from_name:'ٹیسٹ الرٹ', to_name:'ٹیسٹ', fare:1, km:0, status:'searching', when_at:new Date().toISOString() });
+    pushToast('ٹیسٹ پش بھیج دی۔ اب ایپ کو پس منظر میں بھیجیں اور 10 سیکنڈ انتظار کریں');
+    setTimeout(()=>{ api('/bookings?id=eq.'+id,'DELETE').catch(()=>{}); }, 90000);
+  }catch(e){ pushToast('ایرر: '+(e.message||e)); }
+};
 
 /* ہر چند سیکنڈ میں سرور سے تازہ ڈیٹا */
 let lastSig = '';
