@@ -392,7 +392,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const save = () => localStorage.setItem('bookings', JSON.stringify(bookings));
 
-function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add('on'); setTimeout(()=>el.classList.remove('on'),2200); }
+function toast(msg, ms){ const el=$('#toast'); el.textContent=msg; el.classList.add('on'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('on'), ms||2200); }
 
 /* ============ زبان لاگو کریں ============ */
 function applyLang(){
@@ -502,6 +502,7 @@ function okPhone(){ if(dPhone.replace(/\D/g,'').length<10){ toast(t('needPhone')
 /* ============ Supabase ============ */
 const SB = 'https://pbrwemggnblaoioururi.supabase.co/rest/v1';
 const KEY = 'sb_publishable_nY9uL2bBwWtiPjRoiOUCwA_ul52pztp';
+try{ document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;left:6px;bottom:2px;font:10px sans-serif;color:#8a9a94;z-index:1;pointer-events:none">v3.3</div>'); }catch(e){}
 async function api(path, method='GET', body){
   const r = await fetch(SB+path, { method, headers:{ apikey:KEY, 'Content-Type':'application/json', ...(method==='GET'||path.startsWith('/rpc')?{}:{Prefer:'return=minimal'}) }, body: body?JSON.stringify(body):undefined });
   if(!r.ok) throw new Error(await r.text());
@@ -517,7 +518,8 @@ async function pull(){
     return true;
   }catch(e){ console.warn(e); return false; }
 }
-async function mut(fn){ try{ await fn(); await pull(); return true; }catch(e){ console.warn(e); toast(t('netErr')); return false; } }
+function errWhy(e){ let m=String((e&&e.message)||e||''); try{ const j=JSON.parse(m); m=j.message||j.details||j.hint||m; }catch(_){} return m.replace(/\s+/g,' ').slice(0,140); }
+async function mut(fn){ try{ await fn(); await pull(); return true; }catch(e){ console.warn(e); toast(t('netErr')+' ['+errWhy(e)+']', 8000); return false; } }
 
 $('#book').onclick = async ()=>{
   const f=fareNow(); if(!f){ toast(t('pickDrop')); return; }
@@ -869,7 +871,7 @@ async function sendLoc(){
 }
 function startLocLoop(){ if(locTimer) return; locTimer = setInterval(()=>{ if(online && !document.hidden) sendLoc(); }, 60000); }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && online) sendLoc(); });
-if(online){ pushRegister(false).then(()=>sendLoc()); startLocLoop(); }
+try{ if(online){ pushRegister(false).then(()=>sendLoc()); startLocLoop(); } }catch(e){ console.warn('startup', e); }
 
 /* الرٹ سیٹنگ گائیڈ (فون کی سیٹنگ ویب ایپ خود نہیں بدل سکتی، اس لیے مرحلہ وار رہنمائی) */
 function guideRow(ok, text){ return `<li style="margin:8px 0;list-style:none">${ok===true?'✅':ok===false?'❌':'🔹'} ${text}</li>`; }
