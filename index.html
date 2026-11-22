@@ -851,7 +851,6 @@ function checkNewForDriver(){
   if(seenB && open.some(b=>!seenB.has(b.id))) beep();
   seenB = ids;
 }
-if(online){ pushRegister(false).then(()=>sendLoc()); startLocLoop(); }
 
 /* ڈرائیور کی لوکیشن (10 کلومیٹر کے فلٹر کے لیے): ایپ کھلی ہو تو ہر منٹ تازہ ہوتی ہے */
 let lastLoc = null, locTimer = null;
@@ -870,6 +869,7 @@ async function sendLoc(){
 }
 function startLocLoop(){ if(locTimer) return; locTimer = setInterval(()=>{ if(online && !document.hidden) sendLoc(); }, 60000); }
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && online) sendLoc(); });
+if(online){ pushRegister(false).then(()=>sendLoc()); startLocLoop(); }
 
 /* الرٹ سیٹنگ گائیڈ (فون کی سیٹنگ ویب ایپ خود نہیں بدل سکتی، اس لیے مرحلہ وار رہنمائی) */
 function guideRow(ok, text){ return `<li style="margin:8px 0;list-style:none">${ok===true?'✅':ok===false?'❌':'🔹'} ${text}</li>`; }
