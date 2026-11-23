@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12352B">
+<link rel="icon" href="icon-192.png">
 <title>سواری ایڈمن</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -165,6 +168,7 @@ $('#saveBtn').onclick = async ()=>{
 $('#refresh').onclick = load;
 $('#logout').onclick = logout;
 show(); if(tok) load();
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(()=>{});
 </script>
 </body>
 </html>
